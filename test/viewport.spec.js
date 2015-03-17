@@ -1,4 +1,9 @@
 describe('viewport module', function () {
+    angular.module('notifications', []);
+    angular.module('rest.client', []);
+    angular.module('angular.usecase.adapter', []);
+    angular.module('checkpoint', []);
+    angular.module('toggle.edit.mode', []);
     beforeEach(module('viewport'));
     beforeEach(module('config'));
 
