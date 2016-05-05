@@ -1,18 +1,22 @@
 describe('viewport module', function () {
-    angular.module('notifications', []);
-    angular.module('rest.client', []);
-    angular.module('angular.usecase.adapter', []);
-    angular.module('checkpoint', []);
-    angular.module('toggle.edit.mode', []);
     beforeEach(module('viewport'));
-    beforeEach(module('config'));
 
     describe('viewport service', function () {
-        var viewport, window, screenSize;
+        var $rootScope, viewport, window, screenSize, binDebounce;
 
-        beforeEach(inject(function (_viewport_, $window) {
+        beforeEach(inject(function (_$rootScope_, _viewport_, $window, _binDebounce_) {
+            $rootScope = _$rootScope_;
             viewport = _viewport_;
             window = $window;
+            binDebounce = _binDebounce_;
+
+            spyOn(angular, 'element').andCallFake(function () {
+                window.on = jasmine.createSpy('on').andCallFake(function (event, callback) {
+                    callback();
+                });
+                window.off = jasmine.createSpy('off');
+                return window;
+            });
 
             screenSize = {
                 xs: false,
@@ -38,6 +42,68 @@ describe('viewport module', function () {
                 };
             };
         }));
+
+        describe('listen for viewport changes', function () {
+            var newSize, deregister;
+
+            beforeEach(function () {
+                function callback (size) {
+                    newSize = size;
+                }
+
+                deregister = viewport.onChange(callback);
+            });
+
+            it('lookup is debounced and called immediately', function () {
+                expect(binDebounce).toHaveBeenCalledWith(jasmine.any(Function), 150, true);
+            });
+
+            it('listen on resize', function () {
+                expect(window.on).toHaveBeenCalledWith('resize', jasmine.any(Function));
+            });
+
+            describe('with debounced callback', function () {
+                var debounce;
+
+                beforeEach(function () {
+                    debounce = window.on.calls[0].args[1];
+                });
+
+                it('for xs screen size', function () {
+                    screenSize.xs = true;
+                    debounce();
+
+                    expect(newSize).toEqual('xs');
+                });
+
+                it('for sm screen size', function () {
+                    screenSize.sm = true;
+                    debounce();
+
+                    expect(newSize).toEqual('sm');
+                });
+
+                it('for md screen size', function () {
+                    screenSize.md = true;
+                    debounce();
+
+                    expect(newSize).toEqual('md');
+                });
+
+                it('for lg screen size', function () {
+                    screenSize.lg = true;
+                    debounce();
+
+                    expect(newSize).toEqual('lg');
+                });
+
+                it('returns a deregister function', function () {
+                    deregister();
+
+                    expect(window.off).toHaveBeenCalledWith('resize', debounce);
+                });
+            });
+        });
 
         describe('for xs screen size', function () {
             beforeEach(function () {
@@ -162,7 +228,8 @@ describe('viewport module', function () {
                     return {
                         visiblePhone: function () {return true;},
                         visibleTablet: function () {return false},
-                        visibleDesktop: function () {return false}
+                        visibleDesktop: function () {return false},
+                        onChange: function (callback) {callback()}
                     };
                 });
             }));
@@ -192,6 +259,13 @@ describe('viewport module', function () {
 
             describe('when styling is Bootstrap 2', function () {
                 beforeEach(function () {
+                    viewport = {
+                        visiblePhone: function () {return false;},
+                        visibleTablet: function () {return false},
+                        visibleDesktop: function () {return false},
+                        onChange: function (callback) {callback()}
+                    };
+
                     config = {
                         styling: 'bootstrap2'
                     };
@@ -199,13 +273,9 @@ describe('viewport module', function () {
                 });
 
                 it('and viewport is phone', function () {
-                    viewport = {
-                        visiblePhone: function () {return true;},
-                        visibleTablet: function () {return false},
-                        visibleDesktop: function () {return false}
-                    };
+                    viewport.visiblePhone = function () {return true;};
 
-                    UpdateViewportValues(viewport, $window, $rootScope, config);
+                    UpdateViewportValues(viewport, $rootScope, config);
 
                     expect($rootScope.viewport).toEqual({
                         phone: true,
@@ -215,13 +285,9 @@ describe('viewport module', function () {
                 });
 
                 it('and viewport is tablet', function () {
-                    viewport = {
-                        visiblePhone: function () {return false;},
-                        visibleTablet: function () {return true},
-                        visibleDesktop: function () {return false}
-                    };
+                    viewport.visibleTablet = function () {return true};
 
-                    UpdateViewportValues(viewport, $window, $rootScope, config);
+                    UpdateViewportValues(viewport, $rootScope, config);
 
                     expect($rootScope.viewport).toEqual({
                         phone: false,
@@ -231,13 +297,9 @@ describe('viewport module', function () {
                 });
 
                 it('and viewport is desktop', function () {
-                    viewport = {
-                        visiblePhone: function () {return false;},
-                        visibleTablet: function () {return false},
-                        visibleDesktop: function () {return true}
-                    };
+                    viewport.visibleDesktop = function () {return true};
 
-                    UpdateViewportValues(viewport, $window, $rootScope, config);
+                    UpdateViewportValues(viewport, $rootScope, config);
 
                     expect($rootScope.viewport).toEqual({
                         phone: false,
@@ -249,6 +311,14 @@ describe('viewport module', function () {
 
             describe('when styling is Bootstrap 3', function () {
                 beforeEach(function () {
+                    viewport = {
+                        visibleXs: function () {return false;},
+                        visibleSm: function () {return false},
+                        visibleMd: function () {return false},
+                        visibleLg: function () {return false},
+                        onChange: function (callback) {callback()}
+                    };
+
                     config = {
                         styling: 'bootstrap3'
                     };
@@ -256,14 +326,9 @@ describe('viewport module', function () {
                 });
 
                 it('and viewport is xs', function () {
-                    viewport = {
-                        visibleXs: function () {return true;},
-                        visibleSm: function () {return false},
-                        visibleMd: function () {return false},
-                        visibleLg: function () {return false}
-                    };
+                    viewport.visibleXs = function () {return true;};
 
-                    UpdateViewportValues(viewport, $window, $rootScope, config);
+                    UpdateViewportValues(viewport, $rootScope, config);
 
                     expect($rootScope.viewport).toEqual({
                         xs: true,
@@ -274,14 +339,9 @@ describe('viewport module', function () {
                 });
 
                 it('and viewport is sm', function () {
-                    viewport = {
-                        visibleXs: function () {return false;},
-                        visibleSm: function () {return true},
-                        visibleMd: function () {return false},
-                        visibleLg: function () {return false}
-                    };
+                    viewport.visibleSm = function () {return true};
 
-                    UpdateViewportValues(viewport, $window, $rootScope, config);
+                    UpdateViewportValues(viewport, $rootScope, config);
 
                     expect($rootScope.viewport).toEqual({
                         xs: false,
@@ -292,14 +352,9 @@ describe('viewport module', function () {
                 });
 
                 it('and viewport is md', function () {
-                    viewport = {
-                        visibleXs: function () {return false;},
-                        visibleSm: function () {return false},
-                        visibleMd: function () {return true},
-                        visibleLg: function () {return false}
-                    };
+                    viewport.visibleMd = function () {return true};
 
-                    UpdateViewportValues(viewport, $window, $rootScope, config);
+                    UpdateViewportValues(viewport, $rootScope, config);
 
                     expect($rootScope.viewport).toEqual({
                         xs: false,
@@ -310,14 +365,9 @@ describe('viewport module', function () {
                 });
 
                 it('and viewport is lg', function () {
-                    viewport = {
-                        visibleXs: function () {return false;},
-                        visibleSm: function () {return false},
-                        visibleMd: function () {return false},
-                        visibleLg: function () {return true}
-                    };
+                    viewport.visibleLg = function () {return true};
 
-                    UpdateViewportValues(viewport, $window, $rootScope, config);
+                    UpdateViewportValues(viewport, $rootScope, config);
 
                     expect($rootScope.viewport).toEqual({
                         xs: false,
@@ -327,74 +377,22 @@ describe('viewport module', function () {
                     });
                 });
             });
-
-            describe('on window resize', function () {
-                var viewportCallback, timesCalled, appliedToScope;
-
-                beforeEach(function () {
-                    config = {
-                        styling: 'bootstrap2'
-                    };
-
-                    timesCalled = 0;
-
-                    $rootScope.$apply = function (callback) {
-                        appliedToScope = true;
-                        callback();
-                    };
-
-                    _.debounce = jasmine.createSpy().andCallFake(function(callback) {
-                        timesCalled++;
-                        return callback;
-                    });
-
-                    spyOn(angular, 'element').andCallFake(function () {
-                        $window.on = jasmine.createSpy('on').andCallFake(function (event, callback) {
-                            viewportCallback = callback;
-                        });
-                        $window.off = jasmine.createSpy('off');
-                        return $window;
-                    });
-
-                    UpdateViewportValues(viewport, $window, $rootScope, config);
-                });
-
-                it('should bind to the window resize event', function () {
-                    expect($window.on).toHaveBeenCalledWith('resize', jasmine.any(Function));
-                    expect(viewportCallback).toBeDefined();
-                });
-
-                it('viewport values are applied to rootScope and debounced', function () {
-                    viewportCallback();
-                    viewportCallback();
-                    viewportCallback();
-
-                    expect(appliedToScope).toEqual(true);
-                    expect(timesCalled).toEqual(1);
-                });
-            });
         });
     });
 
     describe('viewport directive', function () {
-        var directive, scope, window, mediaQuery, size;
-        var appliedToScope = false;
-        var smallQuery = '(max-width: 767px)';
-        var mediumQuery = '(min-width:768px) and (max-width:979px)';
+        var directive, scope, viewport;
 
-        beforeEach(inject(function ($window, _viewport_) {
-            window = $window;
-            window.matchMedia = function (query) {
-                mediaQuery = query;
-                return {
-                    matches: function () {
-                        if (size == 'small' && mediaQuery == smallQuery) return true;
-                        else return size == 'medium' && mediaQuery == mediumQuery;
-                    }() ? true : false
-                }
+        beforeEach(function () {
+            viewport = {
+                visiblePhone: function () {return false;},
+                visibleTablet: function () {return false},
+                visibleDesktop: function () {return false},
+                onChange: function (callback) {callback()}
             };
-            directive = ViewportDirectiveFactory(window, _viewport_);
-        }));
+
+            directive = ViewportDirectiveFactory(viewport);
+        });
 
         it('restrict to class', function () {
             expect(directive.restrict).toEqual('C');
@@ -405,142 +403,63 @@ describe('viewport module', function () {
                 scope = $rootScope.$new();
             }));
 
-            describe('if mediaMatch is not supported', function () {
+            describe('on small viewport', function () {
+
                 beforeEach(function () {
-                    window.matchMedia = undefined;
+                    viewport.visiblePhone = function () {return true;};
                     directive.link(scope);
                 });
 
-                it('fallback to default values', function () {
-                    expect(scope.viewport.small).toEqual(false);
+                it('viewport is a small screen', function () {
+                    expect(scope.viewport.small).toEqual(true);
+                });
+
+                it('viewport is not a medium screen', function () {
                     expect(scope.viewport.medium).toEqual(false);
-                    expect(scope.viewport.large).toEqual(true);
+                });
+
+                it('viewport is not a large screen', function () {
+                    expect(scope.viewport.large).toEqual(false);
                 });
             });
 
-            describe('if mediaMatch is supported', function () {
+            describe('on medium viewport', function () {
 
-                describe('on small viewport', function () {
-
-                    beforeEach(function () {
-                        size = 'small';
-                        directive.link(scope);
-                    });
-
-                    it('viewport is a small screen', function () {
-                        expect(scope.viewport.small).toEqual(true);
-                    });
-
-                    it('viewport is not a medium screen', function () {
-                        expect(scope.viewport.medium).toEqual(false);
-                    });
-
-                    it('viewport is not a large screen', function () {
-                        expect(scope.viewport.large).toEqual(false);
-                    });
+                beforeEach(function () {
+                    viewport.visibleTablet = function () {return true;};
+                    directive.link(scope);
                 });
 
-                describe('on medium viewport', function () {
-
-                    beforeEach(function () {
-                        size = 'medium';
-                        directive.link(scope);
-                    });
-
-                    it('viewport is not a small screen', function () {
-                        expect(scope.viewport.small).toEqual(false);
-                    });
-
-                    it('viewport is a medium screen', function () {
-                        expect(scope.viewport.medium).toEqual(true);
-                    });
-
-                    it('viewport is not a large screen', function () {
-                        expect(scope.viewport.large).toEqual(false);
-                    });
+                it('viewport is not a small screen', function () {
+                    expect(scope.viewport.small).toEqual(false);
                 });
 
-                describe('on large viewport', function () {
-
-                    beforeEach(function () {
-                        size = 'large';
-                        directive.link(scope);
-                    });
-
-                    it('viewport is not a small screen', function () {
-                        expect(scope.viewport.small).toEqual(false);
-                    });
-
-                    it('viewport is not a medium screen', function () {
-                        expect(scope.viewport.medium).toEqual(false);
-                    });
-
-                    it('viewport is a large screen', function () {
-                        expect(scope.viewport.large).toEqual(true);
-                    });
+                it('viewport is a medium screen', function () {
+                    expect(scope.viewport.medium).toEqual(true);
                 });
 
-                describe('on window resize', function () {
-                    var viewportCallback, timesCalled;
+                it('viewport is not a large screen', function () {
+                    expect(scope.viewport.large).toEqual(false);
+                });
+            });
 
-                    beforeEach(function () {
-                        timesCalled = 0;
+            describe('on large viewport', function () {
 
-                        scope.$apply = function (callback) {
-                            appliedToScope = true;
-                            callback();
-                        };
+                beforeEach(function () {
+                    viewport.visibleDesktop = function () {return true;};
+                    directive.link(scope);
+                });
 
-                        _.debounce = jasmine.createSpy().andCallFake(function(callback) {
-                            timesCalled++;
-                            return callback;
-                        });
+                it('viewport is not a small screen', function () {
+                    expect(scope.viewport.small).toEqual(false);
+                });
 
-                        spyOn(angular, 'element').andCallFake(function () {
-                            window.on = jasmine.createSpy('on').andCallFake(function (event, callback) {
-                                viewportCallback = callback;
-                            });
-                            window.off = jasmine.createSpy('off');
-                            return window;
-                        });
+                it('viewport is not a medium screen', function () {
+                    expect(scope.viewport.medium).toEqual(false);
+                });
 
-                        directive.link(scope);
-                    });
-
-                    it('should bind to the window resize event', function () {
-                        expect(window.on).toHaveBeenCalledWith('resize', jasmine.any(Function));
-                        expect(viewportCallback).toBeDefined();
-                    });
-
-                    it('update viewport values upon resize to medium', function () {
-                        size = 'medium';
-                        viewportCallback();
-
-                        expect(appliedToScope).toEqual(true);
-                        expect(scope.viewport.large).toEqual(false);
-                        expect(scope.viewport.medium).toEqual(true);
-                        expect(scope.viewport.small).toEqual(false);
-                    });
-
-                    it('update viewport values upon resize to small', function () {
-                        size = 'small';
-                        viewportCallback();
-
-                        expect(appliedToScope).toEqual(true);
-                        expect(scope.viewport.large).toEqual(false);
-                        expect(scope.viewport.medium).toEqual(false);
-                        expect(scope.viewport.small).toEqual(true);
-                    });
-
-                    it('resize events should be debounced to prevent unnecessary calls', function () {
-                        viewportCallback();
-                        viewportCallback();
-                        viewportCallback();
-                        viewportCallback();
-
-                        expect(_.debounce).toHaveBeenCalledWith(jasmine.any(Function), 100);
-                        expect(timesCalled).toEqual(1);
-                    });
+                it('viewport is a large screen', function () {
+                    expect(scope.viewport.large).toEqual(true);
                 });
             });
         });

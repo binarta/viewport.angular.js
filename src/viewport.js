@@ -1,9 +1,9 @@
-angular.module('viewport', ['config'])
-    .service('viewport', ['$window', ViewportService])
-    .run(['viewport', '$window', '$rootScope', 'config', UpdateViewportValues])
-    .directive('viewport', ['$window', 'viewport', ViewportDirectiveFactory]);
+angular.module('viewport', ['config', 'angularx'])
+    .service('viewport', ['$window', 'binDebounce', ViewportService])
+    .run(['viewport', '$rootScope', 'config', UpdateViewportValues])
+    .directive('viewport', ['viewport', ViewportDirectiveFactory]);
 
-function UpdateViewportValues(viewport, $window, $rootScope, config) {
+function UpdateViewportValues(viewport, $rootScope, config) {
     var updateViewportValuesForBootstrap2 = function () {
         $rootScope.viewport = {
             phone: viewport.visiblePhone(),
@@ -26,47 +26,51 @@ function UpdateViewportValues(viewport, $window, $rootScope, config) {
         if (config.styling == 'bootstrap3') updateViewportValuesForBootstrap3();
     };
 
-    updateViewportValues();
-    var debouncedUpdate = _.debounce(function () {
-        $rootScope.$apply(function () {
-            updateViewportValues();
-        });
-    }, 100);
-
-    angular.element($window).on('resize', debouncedUpdate);
+    viewport.onChange(updateViewportValues);
 }
 
-function ViewportService($window) {
+function ViewportService($window, binDebounce) {
     //Bootstrap3 media queries
     var xsQuery = '(max-width: 767px)';
     var smQuery = '(min-width: 768px) and (max-width:991px)';
     var mdQuery = '(min-width: 992px) and (max-width:1199px)';
     var lgQuery = '(min-width: 1200px)';
     //Bootstrap2 media queries
-    var phoneQuery = '(max-width: 767px)';
     var tabletQuery = '(min-width:768px) and (max-width:979px)';
     var desktopQuery = '(min-width: 980px)';
 
+    var size;
+    angular.element($window).on('resize', function () {
+        size = undefined;
+    });
+
+    function getSize() {
+        if (!size) {
+            var match = $window.matchMedia;
+            if (!match) size = 'lg';
+            if (!size && match(xsQuery).matches) size = 'xs';
+            if (!size && match(smQuery).matches) size = 'sm';
+            if (!size && match(mdQuery).matches) size = 'md';
+            if (!size && match(lgQuery).matches) size = 'lg';
+        }
+        return size;
+    }
+
     return {
         visibleXs: function () {
-            if ($window.matchMedia) return $window.matchMedia(xsQuery).matches;
-            else return false;
+            return getSize() == 'xs';
         },
         visibleSm: function () {
-            if ($window.matchMedia) return $window.matchMedia(smQuery).matches;
-            else return false;
+            return getSize() == 'sm';
         },
         visibleMd: function () {
-            if ($window.matchMedia) return $window.matchMedia(mdQuery).matches;
-            else return false;
+            return getSize() == 'md';
         },
         visibleLg: function () {
-            if ($window.matchMedia) return $window.matchMedia(lgQuery).matches;
-            else return true;
+            return getSize() == 'lg';
         },
         visiblePhone: function () {
-            if ($window.matchMedia) return $window.matchMedia(phoneQuery).matches;
-            else return false;
+            return getSize() == 'xs';
         },
         visibleTablet: function () {
             if ($window.matchMedia) return $window.matchMedia(tabletQuery).matches;
@@ -75,12 +79,22 @@ function ViewportService($window) {
         visibleDesktop: function () {
             if ($window.matchMedia) return $window.matchMedia(desktopQuery).matches;
             else return true;
+        },
+        onChange: function (callback) {
+            var debounced = binDebounce(function () {
+                callback(getSize());
+            }, 150, true);
+            
+            angular.element($window).on('resize', debounced);
+            return function () {
+                angular.element($window).off('resize', debounced);
+            }
         }
     }
 }
 
 //@deprecated Use viewport hashmap on $rootScope instead.
-function ViewportDirectiveFactory($window, viewport) {
+function ViewportDirectiveFactory(viewport) {
     return {
         restrict: 'C',
         link: function ($scope) {
@@ -91,16 +105,8 @@ function ViewportDirectiveFactory($window, viewport) {
                 $scope.viewport.medium = viewport.visibleTablet();
                 $scope.viewport.large = !$scope.viewport.small && !$scope.viewport.medium;
             }
-
-            updateViewportValues();
-
-            var debouncedUpdate = _.debounce(function () {
-                $scope.$apply(function () {
-                    updateViewportValues();
-                });
-            }, 100);
-
-            angular.element($window).on('resize', debouncedUpdate);
+            
+            viewport.onChange(updateViewportValues);
         }
     };
 }
