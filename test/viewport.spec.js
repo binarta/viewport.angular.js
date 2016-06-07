@@ -10,11 +10,12 @@ describe('viewport module', function () {
             window = $window;
             binDebounce = _binDebounce_;
 
-            spyOn(angular, 'element').andCallFake(function () {
-                window.on = jasmine.createSpy('on').andCallFake(function (event, callback) {
+            spyOn(angular, 'element').and.callFake(function () {
+                window.on = jasmine.createSpy('on').and.callFake(function (event, callback) {
                     callback();
                 });
                 window.off = jasmine.createSpy('off');
+                window.data = function (){};
                 return window;
             });
 
@@ -66,7 +67,7 @@ describe('viewport module', function () {
                 var debounce;
 
                 beforeEach(function () {
-                    debounce = window.on.calls[0].args[1];
+                    debounce = window.on.calls.first().args[1];
                 });
 
                 it('for xs screen size', function () {

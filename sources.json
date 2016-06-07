@@ -1,0 +1,5 @@
+{
+  "default": {
+    "viewport": "bower_components/binarta.viewport.angular/src/viewport.js"
+  }
+}
